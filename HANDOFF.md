@@ -25,3 +25,4 @@ The user keeps clicking them by mistake and never wants to see them.
 ## Status
 - v0.1: manifest.json + content.js written (text match "Max Combo" -> walk up to grid item: parent with 3+ children holding /item/ links). Confirmed working on the live site by the user (2026-11-13).
 - DOM seen so far: card = div > a[href*="/item/"] + div.us--findWrapper ("Similar items"). The "Max Combo" element itself not seen yet.
+- v0.2: popup on/off toggle (chrome.storage.local `enabled`) + count of Max Combo cards on the page (popup text + icon badge, grey when off). Cards are tagged `data-mch-card` regardless of on/off; toggling just shows/hides them. Needs user test on the live site.

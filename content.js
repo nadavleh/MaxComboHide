@@ -4,7 +4,9 @@
 
 const LABEL = /^max\s*combo\b/i;
 const ITEM_LINK = 'a[href*="/item/"]';
-const DONE = 'data-mch-hidden';
+const MARK = 'data-mch-card';
+
+let enabled = true;
 
 // A node "holds a card" if it is, or contains, a link to a product page.
 function holdsItem(el) {
@@ -26,22 +28,50 @@ function findCard(start) {
   return null;
 }
 
+// Find Max Combo cards and tag them (tagging is independent of on/off).
 function scan(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const hits = [];
   for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-    if (LABEL.test(t.nodeValue.trim())) hits.push(t.parentElement);
-  }
-  for (const el of hits) {
-    const card = findCard(el);
-    if (card && !card.hasAttribute(DONE)) {
-      card.setAttribute(DONE, '');
-      card.style.setProperty('display', 'none', 'important');
-    }
+    if (!LABEL.test(t.nodeValue.trim())) continue;
+    const card = findCard(t.parentElement);
+    if (card) card.setAttribute(MARK, '');
   }
 }
 
-scan(document.body);
+let lastCount = -1;
+function apply() {
+  const cards = document.querySelectorAll(`[${MARK}]`);
+  for (const card of cards) {
+    if (enabled) card.style.setProperty('display', 'none', 'important');
+    else card.style.removeProperty('display');
+  }
+  const count = cards.length;
+  if (count !== lastCount) {
+    lastCount = count;
+    chrome.runtime.sendMessage({ type: 'count', count }).catch(() => {});
+  }
+}
+
+function refresh() {
+  scan(document.body);
+  apply();
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (msg.type === 'getCount') reply({ count: lastCount < 0 ? 0 : lastCount });
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if ('enabled' in changes) {
+    enabled = changes.enabled.newValue !== false;
+    apply();
+  }
+});
+
+chrome.storage.local.get({ enabled: true }, (s) => {
+  enabled = s.enabled;
+  refresh();
+});
 
 // Infinite scroll and page changes add cards later.
 let pending = false;
@@ -50,6 +80,6 @@ new MutationObserver(() => {
   pending = true;
   requestAnimationFrame(() => {
     pending = false;
-    scan(document.body);
+    refresh();
   });
 }).observe(document.body, { childList: true, subtree: true, characterData: true });
